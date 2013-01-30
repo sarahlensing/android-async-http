@@ -21,6 +21,7 @@ package com.loopj.android.http;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -52,7 +53,7 @@ import java.io.IOException;
  *     public void onSuccess(String response) {
  *         // Successfully got a response
  *     }
- * 
+ *
  *     &#064;Override
  *     public void onFailure(Throwable e, String response) {
  *         // Response failed :(
@@ -106,15 +107,15 @@ public class AsyncHttpResponseHandler {
      * Fired when a request returns successfully, override to handle in your own code
      * @param content the body of the HTTP response from the server
      */
-    public void onSuccess(String content) {}
+    public void onSuccess(String content, Header[] headers) {}
 
     /**
      * Fired when a request returns successfully, override to handle in your own code
      * @param statusCode the status code of the response
      * @param content the body of the HTTP response from the server
      */
-    public void onSuccess(Header[] headers, int statusCode, String content) {
-        onSuccess(content);
+    public void onSuccess(int statusCode, String content, Header[] headers) {
+        onSuccess(content, headers);
     }
 
     /**
@@ -139,14 +140,14 @@ public class AsyncHttpResponseHandler {
     // Pre-processing of messages (executes in background threadpool thread)
     //
 
-    protected void sendSuccessMessage(Header[] headers, int statusCode, String responseBody) {
-        sendMessage(obtainMessage(SUCCESS_MESSAGE, headers, new Object[]{new Integer(statusCode), responseBody}));
+    protected void sendSuccessMessage(int statusCode, String responseBody, Header[]headers) {
+        sendMessage(obtainMessage(SUCCESS_MESSAGE, new Object[]{new Integer(statusCode), responseBody, headers}));
     }
 
     protected void sendFailureMessage(Throwable e, String responseBody) {
         sendMessage(obtainMessage(FAILURE_MESSAGE, new Object[]{e, responseBody}));
     }
-    
+
     protected void sendFailureMessage(Throwable e, byte[] responseBody) {
         sendMessage(obtainMessage(FAILURE_MESSAGE, new Object[]{e, responseBody}));
     }
@@ -164,8 +165,8 @@ public class AsyncHttpResponseHandler {
     // Pre-processing of messages (in original calling thread, typically the UI thread)
     //
 
-    protected void handleSuccessMessage(Header[] headers, int statusCode, String responseBody) {
-        onSuccess(headers, statusCode, responseBody);
+    protected void handleSuccessMessage(int statusCode, String responseBody, Header[] headers) {
+        onSuccess(statusCode, responseBody, headers);
     }
 
     protected void handleFailureMessage(Throwable e, String responseBody) {
@@ -181,7 +182,7 @@ public class AsyncHttpResponseHandler {
         switch(msg.what) {
             case SUCCESS_MESSAGE:
                 response = (Object[])msg.obj;
-                handleSuccessMessage(Header[] response[0], ((Integer) response[0]).intValue(), (String) response[1]);
+                handleSuccessMessage(((Integer) response[0]).intValue(), (String) response[1], (Header[])response[2]);
                 break;
             case FAILURE_MESSAGE:
                 response = (Object[])msg.obj;
@@ -234,7 +235,7 @@ public class AsyncHttpResponseHandler {
         if(status.getStatusCode() >= 300) {
             sendFailureMessage(new HttpResponseException(status.getStatusCode(), status.getReasonPhrase()), responseBody);
         } else {
-            sendSuccessMessage(response.getAllHeaders(), status.getStatusCode(), responseBody);
+            sendSuccessMessage(status.getStatusCode(), responseBody, response.getAllHeaders());
         }
     }
 }
